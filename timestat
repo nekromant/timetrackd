@@ -1,0 +1,70 @@
+#!/usr/bin/lua
+luasql = require "luasql.mysql"
+env = assert (luasql.mysql())
+con = assert (env:connect("timetrack","root", "12345678"))
+
+function rows (connection, sql_statement)
+   local cursor = assert (connection:execute (sql_statement))
+   return function ()
+      return cursor:fetch();
+	  end
+end
+
+curday   = nil; 
+prev     = nil;
+required = 8 * 60 * 60;
+
+pisduly_threshold = (3) * 60 * 60;
+
+total_needed = 0; 
+total_worked = 0;
+avg = { }
+
+extra_days=2
+total_extra=extra_days * 8 * 60 * 60
+
+
+for timestamp in rows (con, "SELECT UNIX_TIMESTAMP(timestamp) FROM `daily` ORDER BY `daily`.`timestamp` ASC;") do
+   prev = date
+   date = os.date("*t", timestamp);
+   if (nil == curday) then
+      curday = date;
+   else if (date.day ~= prev.day) then
+	 -- Now, time to calculate hours!
+	 elapsed = os.time(prev) - os.time(curday)
+	 percent = elapsed * 100 / required;
+	 total_needed = total_needed + required
+	 total_worked = total_worked + elapsed
+	 if (avg.month ~= curday.month) then
+	    avg.month = curday.month
+	    avg.percent = 0;
+	    avg.days = 0;
+	    avg.total_worked = 0;
+	    avg.total_needed = 0;
+	 end
+
+	 print(curday.month.."-"..curday.day..": at work for "..elapsed..
+	       "/"..required.." seconds "..percent.."%");
+	 avg.days = avg.days + 1;
+	 avg.percent = avg.percent + percent
+	 avg.total_needed = avg.total_needed + required;
+	 avg.total_worked = avg.total_worked + elapsed;
+	 curday = date;
+	end
+   end
+end
+
+
+delta = avg.total_needed - avg.total_worked - total_extra;
+print("Total worked for "..avg.total_worked.."/"..avg.total_needed.." delta "..(delta/60/60).." hrs last month");
+print("Average per work day last month: ".. (avg.percent / avg.days) .."%");
+print("This estimation includes "..extra_days.." extra work days");
+
+if (delta > pisduly_threshold) then
+   print("WARNING: Есть неиллюзорный шанс огрести люлей (недоработка)")
+end
+
+if (delta < -pisduly_threshold) then
+   print("WARNING: Whooohooo, overtime!1")
+end
+

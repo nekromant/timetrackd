@@ -1,0 +1,40 @@
+#!/usr/bin/lua
+luasql = require "luasql.mysql"
+env = assert (luasql.mysql())
+con = assert (env:connect("timetrack","root", "12345678"))
+
+function rows (connection, sql_statement)
+   local cursor = assert (connection:execute (sql_statement))
+   return function ()
+      return cursor:fetch();
+	  end
+end
+
+today = os.date("*t", os.time());
+today.hour = 0; 
+today.min = 0; 
+today.sec = 0; 
+today = os.time(today);
+required = 8 * 60 * 60;
+
+for v in rows (con, 
+"SELECT UNIX_TIMESTAMP(timestamp) FROM `daily` \
+ WHERE UNIX_TIMESTAMP(`timestamp`) > "..today.." \
+ ORDER BY `timestamp` ASC LIMIT 1; \
+ ;") do
+     start = v
+end
+
+function print_time(t)
+   print("hour "..t.hour);
+   print("min "..t.min);
+   print("sec "..t.sec);
+end
+
+
+working = os.time() - start
+percent = working * 100 / required;
+remaining = required - working; 
+remaining = os.date("*t", remaining + os.time{year=1970, month=1, day=1, hour=0});
+print("You're currently working for "..working.." seconds, workday "..percent.."% complete")
+print("There's still "..remaining.hour..":"..remaining.min..":"..remaining.sec.." left")
